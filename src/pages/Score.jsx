@@ -1,102 +1,104 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function Score() {
   const navigate = useNavigate();
-  const [scoreData, setScoreData] = useState(null);
+  const location = useLocation();
+  const result = location.state;
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("currentQuiz"));
-    if (!saved) navigate("/");
-    else setScoreData(saved);
-  }, [navigate]);
+    const currentUser = JSON.parse(localStorage.getItem("bqa_user") || "null");
+    if (!currentUser || !currentUser.name) {
+      navigate("/auth");
+      return;
+    }
 
-  if (!scoreData) return null;
+    if (result) {
+      // Save full quiz history including answers
+      const history = JSON.parse(localStorage.getItem("bqa_history") || "[]");
+      const record = {
+        id: "h" + Date.now(),
+        user: currentUser.name,
+        book: result.book || "Unknown Book",
+        score: result.score || 0,
+        total: result.total || 0,
+        date: new Date().toISOString(),
+        questions: result.questions?.map((q) => ({
+          question: q.question,
+          correctAnswer: q.correct_answer || q.correctAnswer,
+          userAnswer: q.userAnswer,
+        })) || [],
+      };
+      localStorage.setItem("bqa_history", JSON.stringify([record, ...history]));
+    }
+  }, [result, navigate]);
 
-  const shareText = `I just scored ${scoreData.score}/${scoreData.total} on the ${scoreData.book} Bible Quiz! Try it too! ✝️`;
+  if (!result) {
+    return (
+      <div className="p-6 bg-white dark:bg-slate-800 rounded shadow text-center">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+          No score data found.
+        </h2>
+        <button
+          onClick={() => navigate("/")}
+          className="mt-4 px-4 py-2 bg-purple-600 text-white rounded"
+        >
+          Go Home
+        </button>
+      </div>
+    );
+  }
 
-  const shareLink = window.location.origin;
-
-  const handleShare = (platform) => {
-    const encoded = encodeURIComponent(`${shareText} ${shareLink}`);
-    const urls = {
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${shareLink}&quote=${encoded}`,
-      twitter: `https://twitter.com/intent/tweet?text=${encoded}`,
-      whatsapp: `https://api.whatsapp.com/send?text=${encoded}`,
-    };
-    window.open(urls[platform], "_blank");
-  };
+  const { score, total, questions } = result;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-3xl mx-auto p-6 mt-6 bg-white dark:bg-slate-800 rounded-2xl shadow-md"
+      className="p-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg text-center max-w-xl mx-auto"
     >
-      <h1 className="text-3xl font-bold text-center text-purple-600 dark:text-purple-400 mb-4">
+      <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
         Quiz Completed!
-      </h1>
+      </h2>
+      <p className="text-lg text-gray-600 dark:text-gray-300 mb-4">
+        You scored <strong>{score}</strong> out of <strong>{total}</strong>.
+      </p>
 
-      <div className="text-center mb-6">
-        <p className="text-lg text-gray-700 dark:text-gray-300">
-          Book: <strong>{scoreData.book}</strong>
-        </p>
-        <p className="text-2xl font-semibold mt-2">
-          Score: <span className="text-green-600">{scoreData.score}</span> /{" "}
-          {scoreData.total}
-        </p>
-      </div>
+      <div className="border-t border-gray-300 dark:border-slate-700 my-4"></div>
 
-      <div className="space-y-4">
-        {scoreData.questions.map((q, i) => (
-          <div
-            key={i}
-            className="p-4 rounded-lg border dark:border-slate-700 bg-gray-50 dark:bg-slate-700"
-          >
-            <p className="font-semibold mb-2">
-              {i + 1}. {q.question}
-            </p>
+      <div className="max-h-60 overflow-y-auto text-left space-y-2">
+        {questions?.map((q, i) => (
+          <div key={i} className="p-2 border rounded dark:border-slate-700">
+            <p className="font-medium">{i + 1}. {q.question}</p>
             <p
               className={`text-sm ${
-                q.userAnswer === q.correctAnswer
+                q.userAnswer === q.correct_answer || q.userAnswer === q.correctAnswer
                   ? "text-green-500"
                   : "text-red-500"
               }`}
             >
-              Your Answer: {q.userAnswer || "—"}
+              Your answer: {q.userAnswer || "—"}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Correct Answer: {q.correctAnswer}
+              Correct: {q.correct_answer || q.correctAnswer}
             </p>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 flex justify-center gap-4">
+      <div className="mt-6 flex justify-center gap-3">
         <button
           onClick={() => navigate("/")}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
         >
-          Try Again
+          Home
         </button>
         <button
-          onClick={() => handleShare("facebook")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          onClick={() => navigate("/quiz")}
+          className="px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-slate-700"
         >
-          Facebook
-        </button>
-        <button
-          onClick={() => handleShare("twitter")}
-          className="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition"
-        >
-          Twitter
-        </button>
-        <button
-          onClick={() => handleShare("whatsapp")}
-          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
-        >
-          WhatsApp
+          Retry
         </button>
       </div>
     </motion.div>
